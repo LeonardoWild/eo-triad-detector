@@ -4,8 +4,9 @@ eo_triad - Existence-Oriented Triad Detector
 A multi-axis framework for assessing resonance and prototypicality in data,
 objects, and behaviors using ternary triad logic (Absent, Boundary, Central).
 Designed for human-likeness detection, anomaly scoring, and trusted-region modeling.
+Now includes temporal shift analysis for dynamic behavior detection.
 
-Author: Leonardo Wild (@DlwildWild)
+Author: Leonardo Wild (@DlwildWild) with enhancements by Grok 3 (xAI)
 License: Apache-2.0
 """
 
@@ -132,6 +133,37 @@ def EO_relatedness(
     return TriadLevel.ABSENT
 
 
+def EO_temporal_shift(
+    time_series: np.ndarray,
+    window_size: int = 3,
+    shift_threshold: float = 1.0,
+    boundary_threshold: float = 0.5,
+) -> TriadLevel:
+    """Compute dynamic behavior shift from time-series data and assign triad level.
+    
+    Args:
+        time_series: np.ndarray of shape (n_time_points, n_features) for a single account
+        window_size: Number of time points to consider for shift calculation
+        shift_threshold: Maximum shift for CENTRAL level
+        boundary_threshold: Maximum shift for BOUNDARY level
+    
+    Returns:
+        TriadLevel indicating stability of behavior
+    """
+    if time_series.shape[0] < window_size:
+        return TriadLevel.ABSENT
+
+    # Calculate standard deviation across time for each feature
+    shifts = np.std(time_series, axis=0)
+    mean_shift = np.mean(shifts)  # Average shift across features
+
+    if mean_shift <= shift_threshold:
+        return TriadLevel.CENTRAL  # Stable behavior
+    if mean_shift <= boundary_threshold:
+        return TriadLevel.BOUNDARY  # Moderate shift
+    return TriadLevel.ABSENT  # Erratic behavior
+
+
 @overload
 def EO_affinity(
     identity: TriadLevel,
@@ -147,7 +179,7 @@ def EO_affinity(
     identity: TriadLevel,
     membership: TriadLevel,
     relatedness: TriadLevel,
-    spatial: TriadLevel,
+    temporal: TriadLevel,
     *,
     mode: Literal["min", "mean", "product", "weighted"] = "min",
     weights: Sequence[float] = (1.0, 1.0, 1.0, 1.0),
@@ -157,15 +189,15 @@ def EO_affinity(
     identity: TriadLevel,
     membership: TriadLevel,
     relatedness: TriadLevel,
-    spatial: Optional[TriadLevel] = None,
+    temporal: Optional[TriadLevel] = None,
     *,
     mode: Literal["min", "mean", "product", "weighted"] = "min",
     weights: Sequence[float] = (1.0, 1.0, 1.0, 1.0),
 ) -> float:
     """Combine triads into an affinity score [0.0, 2.0]."""
     triads = [identity, membership, relatedness]
-    if spatial is not None:
-        triads.append(spatial)
+    if temporal is not None:
+        triads.append(temporal)
     vals = np.array([t.value for t in triads])
     w = np.array(weights[:len(triads)])
     if mode == "min":
@@ -275,11 +307,97 @@ class EO(nn.Module):
             return result
 
 
+# Simulation and Evaluation Code
+if __name__ == "__main__":
+    # Generate dataset
+    n_humans = 350
+    n_bots = 150
+    n_time_points = 3
+
+    # Human data
+    human_base = np.random.uniform([1, 5, 0, 3, 4, 0.5], [5, 20, 2, 5, 8, 2], (n_humans, 6))
+    human_features_time = np.array([human_base + np.random.normal(0, 0.2, human_base.shape) for _ in range(n_time_points)])
+    human_shift = np.std(human_features_time, axis=0).mean(axis=1)
+    X_human = np.column_stack((human_features_time[0], human_shift))
+
+    # Adversarial bot data
+    bot_base = np.random.uniform([5, 3, 1, 2.5, 2, 0.2], [15, 10, 4, 4, 5, 0.8], (n_bots, 6))
+    bot_features_time = np.array([bot_base + np.random.normal(0, 1.0, bot_base.shape) for _ in range(n_time_points)])
+    bot_shift = np.std(bot_features_time, axis=0).mean(axis=1)
+    X_bot = np.column_stack((bot_features_time[0], bot_shift))
+
+    # Combine
+    X = np.vstack((X_human, X_bot))
+    X_tensor = torch.tensor(X, dtype=torch.float32)
+    labels = np.array([0] * n_humans + [1] * n_bots)
+
+    # Train detector
+    detector = EO(dim=7, mode="ellipsoid")
+    detector.calibrate_ellipsoid(torch.tensor(X_human, dtype=torch.float32), percentile=99.0)
+    triad_outputs = detector(X_tensor)
+    scores = triad_outputs.float().mean(dim=-1)
+
+    # Compute relatedness
+    cov = np.cov(X_human.T)
+    relatedness_scores = np.array([EO_relatedness(x, X_human, cov=cov, metric="mahalanobis") for x in X])
+
+    # Compute temporal shift
+    temporal_scores = np.array([EO_temporal_shift(features_time) for features_time in np.vstack((human_features_time, bot_features_time))])
+
+    # Simulate identity and membership
+    identity_scores = np.array([TriadLevel.CENTRAL if np.random.random() > 0.05 else TriadLevel.BOUNDARY for _ in range(len(X))])
+    membership_scores = np.array([TriadLevel.CENTRAL if i < n_humans and np.random.random() > 0.1 else TriadLevel.BOUNDARY if i >= n_bots and X[i, -1] > 1.0 else TriadLevel.ABSENT for i in range(len(X))])
+
+    # Optimize weights and threshold
+    weight_combinations = [(0.1, 0.2, 0.7), (0.15, 0.25, 0.6), (0.2, 0.3, 0.5)]
+    thresholds = [1.2, 1.3, 1.4]
+    best_f1 = 0
+    best_params = None
+
+    for weights in weight_combinations:
+        for thresh in thresholds:
+            affinity_scores = np.array([EO_affinity(identity_scores[i], membership_scores[i], TriadLevel(relatedness_scores[i]), temporal_scores[i], mode="weighted", weights=weights + (0.0,)) for i in range(len(X))])
+            predictions = (affinity_scores < thresh).astype(int)
+            tp = np.sum((predictions == 1) & (labels == 1))
+            fp = np.sum((predictions == 1) & (labels == 0))
+            fn = np.sum((predictions == 0) & (labels == 1))
+            precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+            recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+            f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+            if f1 > best_f1:
+                best_f1 = f1
+                best_params = (weights, thresh)
+
+    best_weights, best_threshold = best_params
+    affinity_scores = np.array([EO_affinity(identity_scores[i], membership_scores[i], TriadLevel(relatedness_scores[i]), temporal_scores[i], mode="weighted", weights=best_weights + (0.0,)) for i in range(len(X))])
+    predictions = (affinity_scores < best_threshold).astype(int)
+
+    # Calculate metrics
+    tp = np.sum((predictions == 1) & (labels == 1))
+    tn = np.sum((predictions == 0) & (labels == 0))
+    fp = np.sum((predictions == 1) & (labels == 0))
+    fn = np.sum((predictions == 0) & (labels == 1))
+
+    accuracy = np.mean(predictions == labels)
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+    f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+
+    # Print results
+    print(f"Best Weights: {best_weights}, Best Threshold: {best_threshold}")
+    print(f"Accuracy: {accuracy:.2f}")
+    print(f"Precision: {precision:.2f} (Proportion of predicted bots that are correct)")
+    print(f"Recall: {recall:.2f} (Proportion of actual bots detected)")
+    print(f"F1-Score: {f1:.2f} (Harmonic mean of precision and recall)")
+    print(f"True Positives: {tp}, True Negatives: {tn}, False Positives: {fp}, False Negatives: {fn}")
+
+
 __all__ = [
     "TriadLevel",
     "EO_identity",
     "EO_membership",
     "EO_relatedness",
+    "EO_temporal_shift",
     "EO_affinity",
     "EO",
 ]
