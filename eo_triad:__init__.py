@@ -348,15 +348,21 @@ if __name__ == "__main__":
     identity_scores = np.array([TriadLevel.CENTRAL if np.random.random() > 0.05 else TriadLevel.BOUNDARY for _ in range(len(X))])
     membership_scores = np.array([TriadLevel.CENTRAL if i < n_humans and np.random.random() > 0.1 else TriadLevel.BOUNDARY if i >= n_bots and X[i, -1] > 1.0 else TriadLevel.ABSENT for i in range(len(X))])
 
-    # Optimize weights and threshold
-    weight_combinations = [(0.1, 0.2, 0.7), (0.15, 0.25, 0.6), (0.2, 0.3, 0.5)]
+    # Optimize weights and threshold with temporal weight
+    weight_combinations = [
+        (w1, w2, w3, w4) for w1 in [0.1, 0.15, 0.2] 
+        for w2 in [0.2, 0.25, 0.3] 
+        for w3 in [0.5, 0.6, 0.7] 
+        for w4 in [0.0, 0.1, 0.2]
+        if sum([w1, w2, w3, w4]) == 1.0  # Normalize weights to sum to 1
+    ]
     thresholds = [1.2, 1.3, 1.4]
     best_f1 = 0
     best_params = None
 
     for weights in weight_combinations:
         for thresh in thresholds:
-            affinity_scores = np.array([EO_affinity(identity_scores[i], membership_scores[i], TriadLevel(relatedness_scores[i]), temporal_scores[i], mode="weighted", weights=weights + (0.0,)) for i in range(len(X))])
+            affinity_scores = np.array([EO_affinity(identity_scores[i], membership_scores[i], TriadLevel(relatedness_scores[i]), temporal_scores[i], mode="weighted", weights=weights) for i in range(len(X))])
             predictions = (affinity_scores < thresh).astype(int)
             tp = np.sum((predictions == 1) & (labels == 1))
             fp = np.sum((predictions == 1) & (labels == 0))
@@ -369,7 +375,7 @@ if __name__ == "__main__":
                 best_params = (weights, thresh)
 
     best_weights, best_threshold = best_params
-    affinity_scores = np.array([EO_affinity(identity_scores[i], membership_scores[i], TriadLevel(relatedness_scores[i]), temporal_scores[i], mode="weighted", weights=best_weights + (0.0,)) for i in range(len(X))])
+    affinity_scores = np.array([EO_affinity(identity_scores[i], membership_scores[i], TriadLevel(relatedness_scores[i]), temporal_scores[i], mode="weighted", weights=best_weights) for i in range(len(X))])
     predictions = (affinity_scores < best_threshold).astype(int)
 
     # Calculate metrics
