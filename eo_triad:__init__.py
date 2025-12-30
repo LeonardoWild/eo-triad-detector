@@ -85,31 +85,50 @@ def EO_relatedness(
     boundary_threshold: float = 2.0,
     cosine_central: float = 0.90,
     cosine_boundary: float = 0.70,
+    reg: float = 1e-6,  # Added regularization
 ) -> TriadLevel:
     """Assess statistical/directional resonance of x within distribution."""
     if distribution.shape[0] < 2:
         return TriadLevel.ABSENT
+
     try:
         mean = np.mean(distribution, axis=0)
+
         if metric == "mahalanobis":
             if cov is None:
                 cov = np.cov(distribution, rowvar=False)
-            inv_cov = np.linalg.inv(cov)
-            d = np.linalg.norm((x - mean) @ inv_cov**0.5)
+            # Add ridge regularization for stability
+            cov += np.eye(cov.shape[0]) * reg
+            try:
+                inv_cov = np.linalg.inv(cov)
+            except np.linalg.LinAlgError:
+                # Fallback to pseudo-inverse
+                inv_cov = np.linalg.pinv(cov)
+
+            delta = x - mean
+            d = np.sqrt(delta @ inv_cov @ delta)
+
             if np.isnan(d) or np.isinf(d):
-                raise ValueError
+                raise ValueError("Invalid distance")
+
             if d <= resonant_threshold:
                 return TriadLevel.CENTRAL
             if d <= boundary_threshold:
                 return TriadLevel.BOUNDARY
+
         elif metric == "cosine":
             sim = cosine_similarity(x.reshape(1, -1), mean.reshape(1, -1))[0][0]
+            if np.isnan(sim) or np.isinf(sim):
+                raise ValueError("Invalid similarity")
             if sim >= cosine_central:
                 return TriadLevel.CENTRAL
             if sim >= cosine_boundary:
                 return TriadLevel.BOUNDARY
+
     except Exception:
-        pass
+        # Conservative fallback on any numerical issue
+        return TriadLevel.ABSENT
+
     return TriadLevel.ABSENT
 
 
@@ -202,6 +221,7 @@ class EO(nn.Module):
         inv_cov = torch.inverse(cov)
         mahala_sq = torch.sum(centered @ inv_cov * centered, dim=-1)
         threshold = torch.quantile(torch.sqrt(mahala_sq + 1e-12), percentile / 100.0).item()
+
         self.mean.data = mean
         self.inv_cov.data = inv_cov
         self.threshold.data = torch.tensor(threshold)
