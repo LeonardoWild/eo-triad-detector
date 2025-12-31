@@ -136,3 +136,8 @@ We appreciate ideas, bug reports, documentation improvements, and philosophical 
 Apache License 2.0 (LICENSE)
 ##Author
 Daniel Leonard Wild
+
+“Not everything that can be counted counts, and not everything that counts can be counted.” ——William Bruce Cameron.
+Measuring resonance requires more than binary labels.
+
+
