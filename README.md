@@ -132,6 +132,43 @@ Contributions are very welcome! This project follows a philosophy-first, clean-c
 	•	Alternative optimization strategies (Bayesian, evolutionary)
 	•	Soft probability output mode
 We appreciate ideas, bug reports, documentation improvements, and philosophical discussions just as much as code!
+
+## 1. Industrial & Manufacturing Anomaly DetectionPrototype-based methods already power time-series and image anomaly detection in factories (e.g., MVTec AD dataset for defect localization). EO-Triad adds nuanced ternary scoring: Central for canonical machine behavior, Boundary for early wear/degradation, Absent for clear faults.Temporal shift axis detects behavioral drift (e.g., vibration patterns changing over time).
+Ellipsoid mode defines trusted operating regions in sensor embeddings (common with Mahalanobis distance for outlier detection in multivariate sensor data).
+
+# Applications: Predictive maintenance, quality control in assembly lines, rotating machinery monitoring.
+
+## 2. Cybersecurity & Fraud DetectionMulti-axis resonance fits intrusion detection and transaction monitoring, where anomalies often involve subtle behavioral shifts.Identity/membership axes score protocol conformance or user pattern prototypicality.
+Temporal shift flags sudden changes (e.g., account takeover via altered activity rhythm).
+Relatedness via Mahalanobis in network traffic embeddings detects deviations from normal flow distributions.
+
+## Ternary output distinguishes clear attacks (Absent), suspicious but compliant activity (Boundary), and normal (Central)—superior to binary alerts for reducing false positives.Applications: Network intrusion detection, credit card fraud, ransomware behavioral profiling.
+
+## 3. Healthcare & Medical Anomaly DetectionPrototype theory and uncertainty-aware prototypical learning apply to medical imaging and patient monitoring.Score lesions or vital signs against prototypical "healthy" distributions.
+Temporal component detects behavioral shifts (e.g., irregular heart rhythms or mobility patterns in elderly care).
+Fractal boundaries capture ambiguity: Boundary for uncertain/early-stage anomalies needing review.
+
+# Applications: MRI/CT anomaly localization, wearable sensor monitoring for frailty/MCI risk, epidemic outbreak detection via population behavior shifts.
+
+## 4. Financial Time-Series & Cloud Cost MonitoringTemporal shift analysis and multivariate ellipsoids suit detecting spend anomalies or market irregularities.Model normal trading/user behavior as prototypes.
+Flag Boundary for unusual-but-plausible trades (potential insider activity) vs. Absent for clear fraud.
+
+#Applications: Cloud spend anomaly detection (e.g., unexpected spikes), stock market manipulation detection, insurance claim fraud.
+
+## 5. Geosciences & Climate MonitoringPrototype-anomaly scores help detect out-of-distribution changes in non-stationary data.Use EO-Triad to model "normal" climate patterns across spatial/temporal axes.
+Detect subtle shifts (Boundary) vs. extreme events (Absent).
+
+# Applications: Extreme weather event precursors, seismic anomaly detection.
+
+## 6. Human Mobility & Smart CitiesBehavior-aware spatio-temporal frameworks align perfectly with EO-Triad's axes.Profile individual mobility prototypes.
+Detect anomalies like sudden routine changes (potential health/security issues).
+
+# Applications: Elderly monitoring, urban traffic anomaly detection, pandemic behavior shift tracking.
+
+## Why EO-Triad Stands Out Across These AreasIts ternary/fractal logic provides richer interpretability than binary classifiers—Boundary regions highlight ambiguity for human review. Multi-axis design (including optional temporal) captures complex dependencies missed by single-metric methods. Open-source flexibility allows easy adaptation to domain-specific features.
+
+# The framework's philosophical grounding in prototype theory makes it especially powerful for domains where "naturalness" or "expected behavior" is key. It's not just another anomaly detector—it's a resonance measurer
+
 ## License
 Apache License 2.0 (LICENSE)
 ##Author
